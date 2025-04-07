@@ -70,7 +70,7 @@
       "location" : "https://github.com/apple/swift-cluster-membership",
       "state" : {
         "branch" : "main",
-        "revision" : "de9cb8b0a3a01368bdadda3683c8f7254f580756"
+        "revision" : "f558154ce37291f89456150478ec15b7badee974"
       }
     },
     {
@@ -88,7 +88,7 @@
       "location" : "https://github.com/apple/swift-distributed-actors.git",
       "state" : {
         "branch" : "main",
-        "revision" : "fc2f2ab5693db25ca9b0fd0c0dc9959fa7045fd0"
+        "revision" : "8ea4a08a31ec31ee01bfe9b00b8241e0022d709c"
       }
     },
     {
@@ -96,8 +96,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-structured-headers.git",
       "state" : {
-        "revision" : "d01361d32e14ae9b70ea5bd308a3794a198a2706",
-        "version" : "1.2.0"
+        "revision" : "8e769facea6b7d46ea60e5e93635a384fd573480",
+        "version" : "1.2.1"
       }
     },
     {
@@ -105,8 +105,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-types.git",
       "state" : {
-        "revision" : "ef18d829e8b92d731ad27bb81583edd2094d1ce3",
-        "version" : "1.3.1"
+        "revision" : "a0a57e949a8903563aba4615869310c0ebf14c03",
+        "version" : "1.4.0"
       }
     },
     {
@@ -115,7 +115,7 @@
       "location" : "https://github.com/1amageek/swift-json-schema.git",
       "state" : {
         "branch" : "main",
-        "revision" : "ef7c71dcae944c18792a2164501394d111501004"
+        "revision" : "e6a5de6d8625540a4e96766ff5ad04aa31528dc6"
       }
     },
     {
@@ -132,8 +132,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "96a2f8a0fa41e9e09af4585e2724c4e825410b91",
-        "version" : "1.6.2"
+        "revision" : "3d8596ed08bd13520157f0355e35caed215ffbfa",
+        "version" : "1.6.3"
       }
     },
     {
@@ -141,8 +141,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-metrics.git",
       "state" : {
-        "revision" : "5e63558d12e0267782019f5dadfcae83a7d06e09",
-        "version" : "2.5.1"
+        "revision" : "44491db7cc66774ab930cf15f36324e16b06f425",
+        "version" : "2.6.1"
       }
     },
     {
@@ -204,8 +204,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-service-discovery",
       "state" : {
-        "revision" : "78cfea3cc8559f86f3db704597c39e5ce27c05be",
-        "version" : "1.3.0"
+        "revision" : "36c1ab6158b8b5820e6f23ce069684b158b09352",
+        "version" : "1.4.0"
       }
     },
     {
@@ -223,7 +223,7 @@
       "location" : "https://github.com/jamesrochabrun/SwiftAnthropic.git",
       "state" : {
         "branch" : "main",
-        "revision" : "e71ff4df0a2ab4e85fb492f02322980858a8157c"
+        "revision" : "c921b625dcbcc0653343ae63c89d1cbfed0bd539"
       }
     }
   ],

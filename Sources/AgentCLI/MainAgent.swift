@@ -15,7 +15,7 @@ public struct MainAgent: Agent {
     public var body: some Step<String, String> {
         Loop { _ in
             WaitForInput(prompt: "You: ")
-            GeminiAgent()
+            AnthropicAgent()
                 .onOutput { message in
                     print(message)
                 }

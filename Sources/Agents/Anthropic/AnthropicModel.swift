@@ -8,7 +8,6 @@
 import Foundation
 import SwiftAgent
 import AgentTools
-import JSONSchema
 @preconcurrency import SwiftAnthropic
 
 /// A concrete implementation of the Model protocol using SwiftAnthropic's API.
@@ -69,7 +68,7 @@ public struct AnthropicModel<Output: Sendable>: SwiftAgent.Model {
     /// Creates a new instance of AnthropicModel with a Codable output type
     public init(
         model: SwiftAnthropic.Model = .claude35Haiku,
-        schema: JSONSchema, // Note: Currently not used by Anthropic, but kept for interface consistency
+        schema: SwiftAnthropic.JSONSchema, // Note: Currently not used by Anthropic, but kept for interface consistency
         tools: [any Tool] = [],
         systemPrompt: ([any Tool]) -> String
     ) where Output: Codable {
@@ -95,12 +94,13 @@ public struct AnthropicModel<Output: Sendable>: SwiftAgent.Model {
     
     public func run(_ input: [MessageParameter.Message]) async throws -> Output {
         // Convert tools to Anthropic format
-        let anthropicTools = tools.map { tool in
-            MessageParameter.Tool(
+        let anthropicTools = tools.map { tool in            
+            let data = try! JSONEncoder().encode(tool.parameters)
+            let inputSchema = try! JSONDecoder().decode(SwiftAnthropic.JSONSchema.self, from: data)
+            return MessageParameter.Tool.function(
                 name: tool.name,
                 description: tool.description,
-                inputSchema: try? JSONSchema.from(tool.parameters),
-                cacheControl: nil
+                inputSchema: inputSchema,
             )
         }
         
@@ -163,66 +163,6 @@ public enum ModelError: LocalizedError {
         case .toolNotFound(let name):
             return "Tool not found: \(name)"
         }
-    }
-}
-
-// MARK: - JSON Schema Extension
-
-extension JSONSchema {
-    /// Converts a JSONSchema instance to Anthropic's expected schema format.
-    ///
-    /// - Parameter schema: The source JSONSchema to convert
-    /// - Returns: A converted schema in Anthropic's format
-    /// - Throws: Errors if schema conversion fails
-    static func from(_ schema: JSONSchema) throws -> MessageParameter.Tool.JSONSchema {
-        let type = convertJSONType(schema.type)
-        let description = schema.description
-        
-        var properties: [String: MessageParameter.Tool.JSONSchema.Property] = [:]
-        if case .object = schema.type {
-            let property = MessageParameter.Tool.JSONSchema.Property(
-                type: type,
-                description: description
-            )
-            properties["value"] = property
-        }
-        
-        return MessageParameter.Tool.JSONSchema(
-            type: type,
-            properties: properties,
-            required: []
-        )
-    }
-    
-    /// Converts internal schema types to Anthropic's schema types.
-    private static func convertJSONType(_ type: SchemaType) -> MessageParameter.Tool.JSONSchema.JSONType {
-        switch type {
-        case .string:
-            return .string
-        case .number:
-            return .number
-        case .integer:
-            return .integer
-        case .boolean:
-            return .boolean
-        case .array:
-            return .array
-        case .object:
-            return .object
-        case .null, .enum:
-            return .string // Handle null and enum as strings
-        }
-    }
-    
-    /// Creates a basic property definition for the schema.
-    private static func convertToBasicProperty(
-        type: MessageParameter.Tool.JSONSchema.JSONType,
-        description: String?
-    ) -> MessageParameter.Tool.JSONSchema.Property {
-        return MessageParameter.Tool.JSONSchema.Property(
-            type: type,
-            description: description
-        )
     }
 }
 
