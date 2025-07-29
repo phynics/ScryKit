@@ -11,8 +11,7 @@ import LLMChatOpenAI
 
 /// A concrete implementation of the Model protocol using LLMChatOpenAI.
 public struct OpenAIModel<Output: Sendable>: ScryKit.Model {
-    public typealias Input = [ChatMessage]
-    
+public typealias Input = [ScryKit.Message]
     /// The identifier for the OpenAI model to use
     public let model: String
     
@@ -154,15 +153,18 @@ public struct OpenAIModel<Output: Sendable>: ScryKit.Model {
     
     /// Executes the model with the provided input messages
     public func run(_ input: Input) async throws -> Output {
-        var messages = input
-        if !messages.contains(where: { $0.role == .system }) {
-            messages.insert(ChatMessage(role: .system, content: systemPrompt), at: 0)
+        // Convert ScryKit.Messages to ChatMessages
+        var chatMessages = input.map { $0.toOpenAIChatMessage() }
+        
+        // Add system prompt if not present
+        if !input.contains(where: { $0.role == .system }) {
+            chatMessages.insert(Message.system(systemPrompt).toOpenAIChatMessage(), at: 0)
         }
         
         do {
             let response = try await client.send(
                 model: model,
-                messages: messages,
+                messages: chatMessages,
                 options: options
             )
             

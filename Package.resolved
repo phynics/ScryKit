@@ -1,5 +1,5 @@
 {
-  "originHash" : "55d1582c3dba15a472206c2db2fd5ea0046304285b1396c20e06abc368aa8e79",
+  "originHash" : "f7ab873a550d4bcc6767828b294478270bf1b1ceee343eb4eace299c31cea74f",
   "pins" : [
     {
       "identity" : "ollama-swift",

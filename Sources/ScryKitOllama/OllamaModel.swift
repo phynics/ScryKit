@@ -4,24 +4,25 @@ import Ollama
 
 
 public struct OllamaModel<Output: Sendable>: ScryKit.Model {
-    public typealias Input = [Ollama.Chat.Message]
+    public typealias Input = [ScryKit.Message]
+    public typealias Output = ScryKit.Message
     
     private let endpoint: URL?
     private let client: Ollama.Client
     
     public let model: String
+    public let responseFormat: JSONSchema?
     public let think: Bool?
     public let tools: [any ScryKit.Tool]
     
     
     /// The system prompt that provides initial context
     public let systemPrompt: String
-    /// Response parser for converting JSON to Output type
-    private let responseParser: @Sendable (String) throws -> Output
     
     @MainActor
     public init(
         model: String,
+        responseFormat: JSONSchema?,
         think: Bool? = nil,
         endpoint: URL = URL(string: "http://localhost:11484")!,
         tools: [any ScryKit.Tool] = [],
@@ -30,19 +31,22 @@ public struct OllamaModel<Output: Sendable>: ScryKit.Model {
         let initialSystemPrompt = systemPrompt(tools)
         
         self.model = model
+        self.responseFormat = responseFormat
         self.think = think
         self.tools = tools
         self.systemPrompt = initialSystemPrompt
         self.endpoint = endpoint
         self.client = Ollama.Client(host: endpoint)
-        self.responseParser = { $0 }
     }
     
     /// Executes the model with the provided input messages
-    public func run(_ input: Input) async throws -> Output {
-        var messages = input
-        if !messages.contains(where: { $0.role == .system }) {
-            messages.insert(.system(systemPrompt), at: 0)
+    public func run(_ input: Input) async throws -> Message {
+        // Convert ScryKit.Messages to Ollama.Chat.Messages
+        var ollamaMessages = input.map { $0.toOllamaMessage() }
+        
+        // Add system prompt if not present
+        if !input.contains(where: { $0.role == .system }) {
+            ollamaMessages.insert(Message.system(systemPrompt).toOllamaMessage(), at: 0)
         }
         
         do {
@@ -55,18 +59,23 @@ public struct OllamaModel<Output: Sendable>: ScryKit.Model {
             }
             
             let response = try  await client.chat(model: modelId,
-                                                  messages: messages,
+                                                  messages: ollamaMessages,
                                                   options: nil,
                                                   template: nil,
-                                                  format: nil,
+                                                  format: .init(responseFormat),
                                                   tools: toolCards,
                                                   think: think,
                                                   keepAlive: .default)
-            messages.append(response.message)
+            
+            // Convert response back to ScryKit.Message for tool handling
+            let responseMessage = ScryKit.Message(ollamaMessage: response.message)
+            var messages = input
+            messages.append(responseMessage)
+            
             if let toolCalls = response.message.toolCalls {
                 return try await handleToolCalls(toolCalls, messages: input)
             } else {
-                return try responseParser(response.message.content)
+                return .assistant(response.message.content)
             }
         } catch {
             throw OllamaError.unknownError(error)
@@ -75,15 +84,15 @@ public struct OllamaModel<Output: Sendable>: ScryKit.Model {
     
     private func handleToolCalls(
         _ toolCalls: [Ollama.Chat.Message.ToolCall],
-        messages: [Ollama.Chat.Message]
-    ) async throws -> Output {
+        messages: [ScryKit.Message]
+    ) async throws -> Message {
         var messages = messages
         for toolCall in toolCalls {
             let matchingTool = tools.first(where: { $0.name == toolCall.function.name })
             if let matchingTool {
                 let arguments = toolCall.function.arguments
                 let result = try await matchingTool.call(arguments)
-                messages.append(.tool(result))
+                messages.append(.tool(result, name: matchingTool.name))
             }
         }
         return try await run(messages)
