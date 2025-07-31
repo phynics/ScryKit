@@ -17,6 +17,19 @@ public struct Message: Codable, Hashable, Sendable {
         case tool
     }
     
+    /// The details of how the message was generated
+    public struct Details: Codable, Hashable, Sendable {
+        public let modelName: String
+        public let thinkingTrace: String?
+        public let additional: [String: String]
+        
+        public init(modelName: String, thinkingTrace: String? = nil, additional: [String: String] = [:]) {
+            self.modelName = modelName
+            self.thinkingTrace = thinkingTrace
+            self.additional = additional
+        }
+    }
+    
     /// The role of the message sender
     public let role: Role
     
@@ -26,30 +39,45 @@ public struct Message: Codable, Hashable, Sendable {
     /// Optional name for the participant
     public let name: String?
     
+    /// Details of how the response is generated
+    public let details: Details?
+    
     /// Creates a new message
-    public init(role: Role, content: String, name: String? = nil) {
+    public init(role: Role,
+                content: String,
+                name: String? = nil,
+                details: Details? = nil) {
         self.role = role
         self.content = content
         self.name = name
+        self.details = details
     }
     
     /// Creates a system message
-    public static func system(_ content: String, name: String? = nil) -> Message {
-        return Message(role: .system, content: content, name: name)
+    public static func system(_ content: String,
+                              name: String? = nil,
+                              details: Details? = nil) -> Message {
+        return Message(role: .system, content: content, name: name, details: details)
     }
     
     /// Creates a user message
-    public static func user(_ content: String, name: String? = nil) -> Message {
-        return Message(role: .user, content: content, name: name)
+    public static func user(_ content: String,
+                            name: String? = nil,
+                            details: Details? = nil) -> Message {
+        return Message(role: .user, content: content, name: name, details: details)
     }
     
     /// Creates an assistant message
-    public static func assistant(_ content: String, name: String? = nil) -> Message {
-        return Message(role: .assistant, content: content, name: name)
+    public static func assistant(_ content: String,
+                                 name: String? = nil,
+                                 details: Details? = nil) -> Message {
+        return Message(role: .assistant, content: content, name: name, details: details)
     }
     
     /// Creates a tool message
-    public static func tool(_ content: String, name: String? = nil) -> Message {
-        return Message(role: .tool, content: content, name: name)
+    public static func tool(_ content: String,
+                            name: String? = nil,
+                            details: Details? = nil) -> Message {
+        return Message(role: .tool, content: content, name: name, details: details)
     }
 }

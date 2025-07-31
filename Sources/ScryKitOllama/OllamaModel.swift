@@ -72,10 +72,14 @@ public struct OllamaModel<Output: Sendable>: ScryKit.Model {
             var messages = input
             messages.append(responseMessage)
             
+            let details = Message.Details.init(modelName: response.model.model,
+                                               thinkingTrace: response.message.thinking,
+                                               additional: [:])
+            
             if let toolCalls = response.message.toolCalls {
                 return try await handleToolCalls(toolCalls, messages: input)
             } else {
-                return .assistant(response.message.content)
+                return .assistant(response.message.content, details: details)
             }
         } catch {
             throw OllamaError.unknownError(error)

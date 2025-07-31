@@ -8,6 +8,7 @@
 import Foundation
 import ScryKit
 import LLMChatOpenAI
+import RegexBuilder
 
 /// A concrete implementation of the Model protocol using LLMChatOpenAI.
 public struct OpenAIModel<Output: Sendable>: ScryKit.Model {
@@ -181,14 +182,43 @@ public typealias Input = [ScryKit.Message]
                 return try responseParser(results.joined(separator: "\n"))
             }
             
-            if let content = response.choices.first?.message.content {
-                return try responseParser(content)
-            } else if let refusal = response.choices.first?.message.refusal {
-                throw OpenAIModelError.modelRefused(refusal)
+            guard let message = response.choices.first else {
+                throw OpenAIModelError.noContent
             }
             
-            throw OpenAIModelError.noContent
+            guard let firstMessageOption = response.choices.first,
+                  let messageContent = firstMessageOption.message.content else {
+                
+                guard let refusalReason = message.message.refusal else {
+                    throw OpenAIModelError.noContent
+                }
+                
+                throw OpenAIModelError.modelRefused(refusalReason)
+            }
             
+            let thinkingRegex = Regex {
+                Optionally {
+                    ChoiceOf {
+                        "<think>"
+                        Capture {
+                            ZeroOrMore { .any }
+                        }
+                        "</think>"
+                    }
+                }
+                
+                Capture {
+                    ZeroOrMore { .any }
+                }
+            }
+            
+            let (thinkingTrace, remainingMessage) = try parseMessageContent(messageContent)
+            
+            let details: Message.Details = .init(modelName: response.model,
+                                                 thinkingTrace: thinkingTrace,
+                                                 additional: [:])
+            
+            return try responseParser(remainingMessage)
         } catch let error as LLMChatOpenAIError {
             throw error
         } catch let error as OpenAIModelError {
@@ -196,6 +226,44 @@ public typealias Input = [ScryKit.Message]
         } catch {
             throw LLMChatOpenAIError.networkError(error)
         }
+    }
+    
+    func parseMessageContent(_ messageContent: String) throws -> (thinking: String?, content: String) {
+        let thinkingBlockRegex = Regex {
+            ChoiceOf {
+                "<think>"
+                "<thinking>"
+            }
+            Capture {
+                ZeroOrMore { .any }
+            }
+            ChoiceOf {
+                "</think>"
+                "</thinking>"
+            }
+        }
+        
+        let finalRegex = Regex {
+            Optionally {
+                thinkingBlockRegex
+            }
+            Capture {
+                ZeroOrMore { .any }
+            }
+        }
+        
+        if let match = try finalRegex.firstMatch(in: messageContent) {
+            let (wholeMatch, thinking, content) = match.output
+            
+            switch match.output {
+            case let (_, .some(thinking), content):
+                return (thinking: String(thinking), content: String(content))
+            case let (_, .none, content):
+                return (thinking: .none, content: String(content))
+            }
+        }
+        
+        return (thinking: nil, content: messageContent)
     }
 }
 
