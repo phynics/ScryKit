@@ -21,12 +21,15 @@ let package = Package(
         .package(url: "https://github.com/kevinhermawan/swift-json-schema.git", .upToNextMajor(from: "2.0.0")),
         .package(url: "https://github.com/kevinhermawan/swift-llm-chat-openai.git", .upToNextMajor(from: "1.0.0")),
         .package(url: "https://github.com/loopwork/ollama-swift.git", .upToNextMajor(from: "1.8.0")),
+        .package(url: "https://github.com/1amageek/OpenFoundationModels.git", branch: "main")
     ],
     targets: [
         .target(
             name: "ScryKit",
             dependencies: [
                 .product(name: "JSONSchema", package: "swift-json-schema"),
+                .product(name: "OpenFoundationModels", package: "OpenFoundationModels"),
+                .product(name: "OpenFoundationModelsMacros", package: "OpenFoundationModels")
             ]
         ),
         .target(

@@ -4,39 +4,32 @@ import Ollama
 
 
 public struct OllamaModel<Output: Sendable>: ScryKit.Model {
-    public typealias Input = [ScryKit.Message]
-    public typealias Output = ScryKit.Message
     
-    private let endpoint: URL?
     private let client: Ollama.Client
     
-    public let model: String
-    public let responseFormat: JSONSchema?
-    public let think: Bool?
     public let tools: [any ScryKit.Tool]
-    
     
     /// The system prompt that provides initial context
     public let systemPrompt: String
+    public let configuration: OllamaModelConfiguration
+    
+    public let responseFormat: JSONSchema?
     
     @MainActor
     public init(
-        model: String,
-        responseFormat: JSONSchema?,
-        think: Bool? = nil,
-        endpoint: URL = URL(string: "http://localhost:11484")!,
+        urlSession: URLSession = .init(configuration: .default),
+        configuration: OllamaModelConfiguration,
+        responseFormat: JSONSchema? = nil,
         tools: [any ScryKit.Tool] = [],
         systemPrompt: ([any ScryKit.Tool]) -> String
     ) where Output == String {
         let initialSystemPrompt = systemPrompt(tools)
-        
-        self.model = model
-        self.responseFormat = responseFormat
-        self.think = think
+        self.configuration = configuration
         self.tools = tools
         self.systemPrompt = initialSystemPrompt
-        self.endpoint = endpoint
-        self.client = Ollama.Client(host: endpoint)
+        self.responseFormat = responseFormat
+        
+        self.client = Ollama.Client(session: urlSession, host: configuration.endpoint)
     }
     
     /// Executes the model with the provided input messages
@@ -50,21 +43,24 @@ public struct OllamaModel<Output: Sendable>: ScryKit.Model {
         }
         
         do {
-            guard let modelId = Model.ID(rawValue: model) else {
-                throw OllamaError.invalidModelName
-            }
-            
             let toolCards: [any ToolProtocol] = tools.map {
                 ToolCard(internalTool: $0)
             }
             
-            let response = try  await client.chat(model: modelId,
+            let formatValue: Value?
+            if let responseFormat {
+                formatValue = try .init(responseFormat)
+            } else {
+                formatValue = nil
+            }
+           
+            let response = try  await client.chat(model: configuration.model,
                                                   messages: ollamaMessages,
                                                   options: nil,
                                                   template: nil,
-                                                  format: .init(responseFormat),
+                                                  format: formatValue,
                                                   tools: toolCards,
-                                                  think: think,
+                                                  think: configuration.think,
                                                   keepAlive: .default)
             
             // Convert response back to ScryKit.Message for tool handling
@@ -76,8 +72,10 @@ public struct OllamaModel<Output: Sendable>: ScryKit.Model {
                                                thinkingTrace: response.message.thinking,
                                                additional: [:])
             
-            if let toolCalls = response.message.toolCalls {
-                return try await handleToolCalls(toolCalls, messages: input)
+            if let toolCalls = response.message.toolCalls, !toolCalls.isEmpty {
+                return .assistantToolCall(response.message.content,
+                                          toolCalls: try handleToolCalls(toolCalls),
+                                          details: details)
             } else {
                 return .assistant(response.message.content, details: details)
             }
@@ -86,25 +84,20 @@ public struct OllamaModel<Output: Sendable>: ScryKit.Model {
         }
     }
     
-    private func handleToolCalls(
-        _ toolCalls: [Ollama.Chat.Message.ToolCall],
-        messages: [ScryKit.Message]
-    ) async throws -> Message {
-        var messages = messages
-        for toolCall in toolCalls {
-            let matchingTool = tools.first(where: { $0.name == toolCall.function.name })
-            if let matchingTool {
-                let arguments = toolCall.function.arguments
-                let result = try await matchingTool.call(arguments)
-                messages.append(.tool(result, name: matchingTool.name))
-            }
+    private func handleToolCalls(_ calls: [Ollama.Chat.Message.ToolCall]) throws -> [String: Data] {
+        var result: [String: Data] = [:]
+        
+        for toolCall in calls {
+            result[toolCall.function.name] = try JSONEncoder().encode(toolCall.function.arguments)
         }
-        return try await run(messages)
+        
+        return result
     }
 }
 
 public enum OllamaError: Error {
     case invalidModelName
     case failedToolConversion
+    case failedToolParameters
     case unknownError(Error)
 }

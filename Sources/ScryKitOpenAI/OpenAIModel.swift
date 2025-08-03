@@ -12,18 +12,13 @@ import RegexBuilder
 
 /// A concrete implementation of the Model protocol using LLMChatOpenAI.
 public struct OpenAIModel<Output: Sendable>: ScryKit.Model {
-public typealias Input = [ScryKit.Message]
-    /// The identifier for the OpenAI model to use
-    public let model: String
-    
     /// An array of tools available to the model
     public let tools: [any Tool]
     
+    public let configuration: OpenAIModelConfiguration
+    
     /// The system prompt that provides initial context
     public let systemPrompt: String
-    
-    /// The endpoint URL for API calls
-    private let endpoint: URL?
     
     /// Options for chat completion
     private let options: ChatOptions
@@ -36,9 +31,7 @@ public typealias Input = [ScryKit.Message]
     
     /// Creates a new instance of OpenAIModel for text output
     public init(
-        model: String = "gpt-4o-mini",
-        endpoint: URL? = nil,
-        options: ChatOptions? = nil,
+        configuration: OpenAIModelConfiguration,
         tools: [any Tool] = [],
         systemPrompt: ([any Tool]) -> String
     ) where Output == String {
@@ -47,7 +40,7 @@ public typealias Input = [ScryKit.Message]
         // Configure tools and options
         let initialOptions: ChatOptions
         if tools.isEmpty {
-            initialOptions = options ?? ChatOptions()
+            initialOptions = configuration.options ?? ChatOptions()
         } else {
             let toolOptions = tools.map { tool in
                 ChatOptions.Tool(
@@ -61,37 +54,34 @@ public typealias Input = [ScryKit.Message]
             }
             
             initialOptions = ChatOptions(
-                frequencyPenalty: options?.frequencyPenalty,
-                logitBias: options?.logitBias,
-                topLogprobs: options?.topLogprobs,
-                maxCompletionTokens: options?.maxCompletionTokens,
-                n: options?.n,
-                presencePenalty: options?.presencePenalty,
-                responseFormat: options?.responseFormat,
-                seed: options?.seed,
-                stop: options?.stop,
-                temperature: options?.temperature,
-                topP: options?.topP,
+                frequencyPenalty: configuration.options?.frequencyPenalty,
+                logitBias: configuration.options?.logitBias,
+                topLogprobs: configuration.options?.topLogprobs,
+                maxCompletionTokens: configuration.options?.maxCompletionTokens,
+                n: configuration.options?.n,
+                presencePenalty: configuration.options?.presencePenalty,
+                responseFormat: configuration.options?.responseFormat,
+                seed: configuration.options?.seed,
+                stop: configuration.options?.stop,
+                temperature: configuration.options?.temperature,
+                topP: configuration.options?.topP,
                 tools: toolOptions,
-                toolChoice: options?.toolChoice,
-                user: options?.user
+                toolChoice: configuration.options?.toolChoice,
+                user: configuration.options?.user
             )
         }
         
-        self.model = model
+        self.options = initialOptions
+        self.configuration = configuration
         self.tools = tools
         self.systemPrompt = initialSystemPrompt
-        self.endpoint = endpoint
-        self.options = initialOptions
-        self.client = LLMChatOpenAI(apiKey: ProcessInfo.processInfo.environment["OPENAI_API_KEY"] ?? "", endpoint: endpoint)
+        self.client = LLMChatOpenAI(apiKey: configuration.apiKey, endpoint: configuration.endpoint)
         self.responseParser = { $0 }
     }
     
     /// Creates a new instance of OpenAIModel with a Codable output type
     public init(
-        model: String = "gpt-4o-mini",
-        endpoint: URL? = nil,
-        options: ChatOptions? = nil,
+        configuration: OpenAIModelConfiguration,
         schema: JSONSchema,
         tools: [any Tool] = [],
         systemPrompt: ([any Tool]) -> String
@@ -122,28 +112,27 @@ public typealias Input = [ScryKit.Message]
         }
         
         let initialOptions = ChatOptions(
-            frequencyPenalty: options?.frequencyPenalty,
-            logitBias: options?.logitBias,
-            topLogprobs: options?.topLogprobs,
-            maxCompletionTokens: options?.maxCompletionTokens,
-            n: options?.n,
-            presencePenalty: options?.presencePenalty,
-            responseFormat: schemaFormat,
-            seed: options?.seed,
-            stop: options?.stop,
-            temperature: options?.temperature,
-            topP: options?.topP,
-            tools: toolOptions.isEmpty ? nil : toolOptions,
-            toolChoice: options?.toolChoice,
-            user: options?.user
+            frequencyPenalty: configuration.options?.frequencyPenalty,
+            logitBias: configuration.options?.logitBias,
+            topLogprobs: configuration.options?.topLogprobs,
+            maxCompletionTokens: configuration.options?.maxCompletionTokens,
+            n: configuration.options?.n,
+            presencePenalty: configuration.options?.presencePenalty,
+            responseFormat: configuration.options?.responseFormat,
+            seed: configuration.options?.seed,
+            stop: configuration.options?.stop,
+            temperature: configuration.options?.temperature,
+            topP: configuration.options?.topP,
+            tools: toolOptions,
+            toolChoice: configuration.options?.toolChoice,
+            user: configuration.options?.user
         )
         
-        self.model = model
+        self.options = initialOptions
+        self.configuration = configuration
         self.tools = tools
         self.systemPrompt = initialSystemPrompt
-        self.endpoint = endpoint
-        self.options = initialOptions
-        self.client = LLMChatOpenAI(apiKey: ProcessInfo.processInfo.environment["OPENAI_API_KEY"] ?? "", endpoint: endpoint)
+        self.client = LLMChatOpenAI(apiKey: configuration.apiKey, endpoint: configuration.endpoint)
         self.responseParser = { jsonString in
             guard let data = jsonString.data(using: .utf8) else {
                 throw OpenAIModelError.invalidResponse
@@ -153,7 +142,7 @@ public typealias Input = [ScryKit.Message]
     }
     
     /// Executes the model with the provided input messages
-    public func run(_ input: Input) async throws -> Output {
+    public func run(_ input: [ScryKit.Message]) async throws -> ScryKit.Message {
         // Convert ScryKit.Messages to ChatMessages
         var chatMessages = input.map { $0.toOpenAIChatMessage() }
         
@@ -164,7 +153,7 @@ public typealias Input = [ScryKit.Message]
         
         do {
             let response = try await client.send(
-                model: model,
+                model: configuration.model,
                 messages: chatMessages,
                 options: options
             )
@@ -306,13 +295,14 @@ extension OpenAIModel where Output: Codable {
             user: options.user
         )
         
-        return OpenAIModel(
-            model: self.model,
-            endpoint: self.endpoint,
-            options: newOptions,
-            schema: schema,
-            tools: self.tools,
-            systemPrompt: { _ in self.systemPrompt }            
-        )
+        let newConfiguration = OpenAIModelConfiguration(model: self.configuration.model,
+                                                        endpoint: self.configuration.endpoint,
+                                                        apiKey: self.configuration.apiKey,
+                                                        options: newOptions)
+        
+        return OpenAIModel(configuration: newConfiguration,
+                           schema: schema,
+                           tools: self.tools,
+                           systemPrompt: { _ in self.systemPrompt })
     }
 }

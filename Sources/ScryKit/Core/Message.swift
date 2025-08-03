@@ -14,7 +14,7 @@ public struct Message: Codable, Hashable, Sendable {
         case assistant
         
         /// A message from a tool/function call
-        case tool
+        case toolResult
     }
     
     /// The details of how the message was generated
@@ -39,6 +39,9 @@ public struct Message: Codable, Hashable, Sendable {
     /// Optional name for the participant
     public let name: String?
     
+    /// Optional tool calls from the assistant
+    public let toolCalls: [String: Data]?
+    
     /// Details of how the response is generated
     public let details: Details?
     
@@ -46,10 +49,12 @@ public struct Message: Codable, Hashable, Sendable {
     public init(role: Role,
                 content: String,
                 name: String? = nil,
+                toolCalls: [String: Data]? = nil,
                 details: Details? = nil) {
         self.role = role
         self.content = content
         self.name = name
+        self.toolCalls = toolCalls
         self.details = details
     }
     
@@ -75,9 +80,17 @@ public struct Message: Codable, Hashable, Sendable {
     }
     
     /// Creates a tool message
-    public static func tool(_ content: String,
-                            name: String? = nil,
-                            details: Details? = nil) -> Message {
-        return Message(role: .tool, content: content, name: name, details: details)
+    public static func toolResult(_ toolResult: String,
+                                  toolName: String,
+                                  details: Details? = nil) -> Message {
+        return Message(role: .toolResult, content: toolResult, name: toolName, details: details)
+    }
+    
+    /// Creates an assistant message
+    public static func assistantToolCall(_ content: String,
+                                         name: String? = nil,
+                                         toolCalls: [String: Data],
+                                         details: Details? = nil) -> Message {
+        return Message(role: .assistant, content: content, name: name, toolCalls: toolCalls, details: details)
     }
 }

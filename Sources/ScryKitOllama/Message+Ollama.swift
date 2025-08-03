@@ -20,7 +20,7 @@ extension Message {
             return .user(content)
         case .assistant:
             return .assistant(content)
-        case .tool:
+        case .toolResult:
             return .tool(content)
         }
     }
@@ -30,13 +30,13 @@ extension Message {
         let role: Message.Role
         switch ollamaMessage.role {
         case .system:
-                role = .system
+            role = .system
         case .user:
-                role = .user
+            role = .user
         case .assistant:
-                role = .assistant
+            role = .assistant
         case .tool:
-                role = .tool
+            role = .toolResult
         }
         self.init(role: role,
                   content: ollamaMessage.content,
